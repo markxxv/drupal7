@@ -1,6 +1,6 @@
 {
   "name": "knowfox/drupal7",
-  "description": "Import the Drupal7 blog from https://olav.net .",
+  "description": "Import a Drupal7 website into Knowfox.",
   "type": "library",
   "require": {
     "illuminate/support": "^5.5"

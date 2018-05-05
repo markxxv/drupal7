@@ -3,13 +3,6 @@
 namespace Knowfox\Drupal7\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Support\Facades\Config;
-use GuzzleHttp\Client as GuzzleClient;
-use GuzzleHttp\Cookie\CookieJar;
-use Knowfox\Entangle\Models\ImportedEvent;
-use Knowfox\Entangle\Models\ImportedUser;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ImportDrupal7 extends Command
 {
