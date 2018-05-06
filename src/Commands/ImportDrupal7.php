@@ -53,11 +53,16 @@ class ImportDrupal7 extends Command
             if ($body[0] != 'img_assist') {
 
                 if (preg_match('/\[image:(\d+),([^,]+),(\d+)\]/', $matches[0], $m)) {
-                    return '<div class="image float-' . $m[2] . '">![image-' . $m[1] . '](/uuid/' . self::UUID . $m[1] . '/image)</div>';
+                    $img = '/uuid/' . self::UUID . $m[1] . '/image';
+                    return '<div class="image pull-' . $m[2] . '">'
+                        . '<a data-featherlight="' . $img . '">'
+                        . '<img src="' . $img . '?style=square' . '"></a></div>';
                 }
 
                 if (preg_match('/\[image:(\d+),([^,]+)\]/', $matches[0], $m)) {
-                    return '![image-' . $m[1] . '](/uuid/' . self::UUID . $m[1] . '/image)';
+                    $img = '/uuid/' . self::UUID . $m[1] . '/image';
+                    return '<a data-featherlight="' . $img . '">'
+                        . '<img src="' . $img . '?style=square' . '"></a>';
                 }
 
                 if (preg_match('/\[([^\|]+)\|([^\]]+)\]/', $matches[0], $m)) {
@@ -91,13 +96,15 @@ class ImportDrupal7 extends Command
                 return $matches[0];
             }
 
-            $result = '![image-' . $props['nid'] . '](/uuid/' . self::UUID . $props['nid'] . '/image';
+            $img = '/uuid/' . self::UUID . $props['nid'] . '/image';
+
+            $result = '<a data-featherlight="' . $img . '"><img src="' . $img;
             if (isset($props['width'])) {
                 $result .= '?width=' . $props['width'];
             }
-            $result .= ')';
+            $result .= '"></a>';
             if (isset($props['align'])) {
-                $result = '<div class="image float-' . $props['align'] . '">' . $result . '</div>';
+                $result = '<div class="image pull-' . $props['align'] . '">' . $result . '</div>';
             }
             return $result;
         }, $text);
@@ -111,13 +118,6 @@ class ImportDrupal7 extends Command
     public function handle(PictureService $picture) {
         $this->info("Importing from database " . env('DB_D7_DATABASE') . '...');
 
-        $years = Concept::firstOrCreate([
-            'owner_id' => self::USER_ID,
-            'parent_id' => self::ROOT_ID,
-            'title' => 'Jahresübersicht',
-            'type' => 'folder',
-        ]);
-
         $nodes = ImportedNode::with('revision')->orderBy('nid')->get();
         foreach ($nodes as $node) {
 
@@ -128,14 +128,24 @@ class ImportDrupal7 extends Command
                 $created_at = strftime('%Y-%m-%d %H:%M:%S', $node->created);
                 $updated_at = strftime('%Y-%m-%d %H:%M:%S', $node->changed);
 
+                $year = strftime('%Y', $node->created);
+                $year_concept = Concept::firstOrNew([
+                    'owner_id' => self::USER_ID,
+                    'parent_id' => self::ROOT_ID,
+                    'title' => $year,
+                    'type' => 'folder',
+                ]);
+                $year_concept->config = ['sort' => 'created'];
+                $year_concept->save();
+
                 $concept = Concept::firstOrNew([
+                    'owner_id' => self::USER_ID,
                     'uuid' => self::UUID . $node->nid,
                 ]);
 
                 $latest = $node->revision()->first();
 
-                $concept->owner_id = self::USER_ID;
-                $concept->parent_id = self::ROOT_ID;
+                $concept->parent_id = $year_concept->id;
                 $concept->title = $node->title;
                 $concept->created_at = $created_at;
                 $concept->updated_at = $updated_at;
@@ -167,22 +177,6 @@ class ImportDrupal7 extends Command
 
                 if (!$node->files->count()) {
                     continue;
-                }
-
-                $year = strftime('%Y', $node->created);
-                $year_concept = Concept::firstOrCreate([
-                    'owner_id' => self::USER_ID,
-                    'parent_id' => $years->id,
-                    'title' => 'Jahr ' . $year,
-                ], [
-                    'body' => "| Datum | Titel |\n| -------- | -------- |\n",
-                ]);
-
-                if (strpos($year_concept->body, "(/{$concept->id})") === false) {
-                    $year_concept->body .= strftime('| %d.%m. | ', $node->created)
-                        . '[' . $node->title . "](/{$concept->id}) |\n";
-                    $year_concept->disableVersioning();
-                    $year_concept->save();
                 }
 
                 $directory = $picture->imageDirectory($concept->uuid);
